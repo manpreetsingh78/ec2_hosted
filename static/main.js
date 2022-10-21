@@ -24,7 +24,7 @@ const sendsearchdata = (game) => {
             resultbox.innerHTML = ""
             if (Array.isArray(data)) {
                 data.forEach(game => {
-                    resultbox.innerHTML += `<option>${game.address}</option>`
+                    resultbox.innerHTML += `<option id=${game.pk}>${game.address}</option>`
                     searchinput.innerHTML = `${game.address}`
                     lat.value = `${game.lat}`
                     long.value = `${game.long}`

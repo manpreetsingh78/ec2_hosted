@@ -1,6 +1,6 @@
 import json
 from django.shortcuts import render,redirect
-from .models import City,address
+from .models import CityNames,Location, Products, price_weight_location_relation
 from django.http import HttpResponse,JsonResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import login_required
 
@@ -92,86 +92,41 @@ def search_button_execution(search_query,lat,long):
         'Referer': 'https://www.bigbasket.com/',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'
     }
-
-    
+    url = f"https://www.bigbasket.com/listing-svc/v2/products?type=ps&slug={search_query}"
     r = requests.get(f'https://www.bigbasket.com/listing-svc/v2/products?type=ps&slug={search_query}&page=1',headers=headers)
+    page_data_json = r.json()
+    final_data = []
+    no_of_pages = int(page_data_json['tabs'][0]['product_info']['number_of_pages'])
+    items = int(page_data_json['tabs'][0]['product_info']['total_count'])
+    print("Total no. of Pages:- ",no_of_pages)
+    for k in range(1,no_of_pages+1):
+        print("Scrapping Page:- ",k)
+        f = requests.get(url=str(url)+"&page="+str(k),headers=headers)
+        final_data.append(f.json())
+        # print(data_json)
 
     # print(r.text)
-    return r.text
+    return final_data , no_of_pages,items
 
-
-def fetch_address_by_city(city_unique_id):
-    from time import time
-    print("Fetching Started")
-    import requests
-    header = {
-    'authority': 'www.bigbasket.com',
-    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-    'accept-encoding': 'gzip, deflate, br',
-    'cookie': '''bb_cid=1; _bb_vid="NzIwNDM1NTg3MQ=="; _bb_tc=0; _client_version=2590; _bb_rdt="MzExNjU1NTc4Ng==.0"; _bb_rd=6; sessionid=v3uu8l9ursk5cat56a1cjzwiucedu2bl; _gid=GA1.2.785627896.1664443464; bigbasket.com=36847bad-10db-46d5-8a70-c62859258577; adb=0; bbscc=2; jedi=2; _gcl_au=1.1.1485070885.1664443466; ufi=1; csrftoken=fE4pz6iu8ReVigmiCEfJZE2KjtUs2aNs4anV8B1auLxQCdCi612rCMo7wcFrxMXy; _vz=viz_63356e0d8fe28; _vz=; _sp_van_encom_hid=3273; _bb_hid=3274; _sp_bike_hid=3271; _bb_visaddr="fEhTUiBMYXlvdXQgU2VjdG9yIDMsIEhTUiBDbHViIHJvYWQgTmVhciBOZXcgYm9ybiBifDEyLjkwOTM1MjAwMTg4OTI4fDc3LjY0MzM2MjgxMDgyODk5fDU2MDEwMnw="; _bb_aid="Mjk4MTQ2NTA2Ng=="; x-channel=web; _bb_bb2.0=1; _bb_sa_ids=10215; isPwaPilot=true; bb2_enabled=true; csurftoken=l8vNMg.NzIwNDM1NTg3MQ==.1664445973551.0faFB4OeUVOgWwVs/OjmqGEpCnIoGDzNgRK8vGL6hWs=; isRedirectedFromTCP=false; tneuSessionId=2e77df2d-8a43-4683-833e-0df61eb9b911; _ga_FRRYG5VKHX=GS1.1.1664445957.2.1.1664446694.0.0.0; _ga=GA1.2.216632993.1664443464; ts=2022-09-29 10:18:15.982''',
-    'user-agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
-    }
-    t1 = time()
-    counter = 0
-    for i in range(97,123):
-        for y in range(97,123):
-            ar = str(chr(i)+chr(y))
-            print(ar)
-            r = requests.get(f'https://www.bigbasket.com/bbplacessearch/getplaces/?term={ar}&city_id={city_unique_id}',headers=header)
-            # print(r.text)
-            import json
-            address_data = []
-            json_data = json.loads(r.text)
-            for j in range(10):
-                try:
-                    pincode = str(json_data['response']['results'][j]['pincode'])
-                    addresss = str(json_data['response']['results'][j]['display_name'])
-                    latitude = float(json_data['response']['results'][j]['location'][1])
-                    longitude = float(json_data['response']['results'][j]['location'][0])
-                    addresss = str(json_data['response']['results'][j]['display_name'])
-                    full_ = addresss + " " + pincode
-                    print(full_)
-                    print(latitude)
-                    print(longitude)
-                    if pincode in address_data:
-                        continue
-                    city_idd = City.objects.get(id=1)
-                    addres = full_
-                    try:
-                        add_obj = address(city_id=city_idd,address_field = addres,lat=latitude,long=longitude)
-                        add_obj.save()
-                        print("Data added;- ",city_idd,addres)
-                        counter += 1
-                    except Exception as e:
-                        print(e)
-                except Exception as e:
-                    print(e)
-    t2 = time()
-    print(t2-t1)
-    return counter
-
-@login_required(login_url='/admin')
-def homepage(request):
-    if request.method == 'GET':
-        return render(request,"index.html")
-    elif request.method == 'POST':
-        search_query = str(request.POST.get("search_query"))
-        lat = request.POST.get("lat")
-        long = request.POST.get("long")
-        print(lat)
-        print(long)
-        search_query =search_query.strip().replace(" ","%20")
-        print(search_query)
-        result = search_button_execution(search_query,lat,long)
-        result = json.loads(str(result))
+def home_bkp():
+    search_query = str(request.POST.get("search_query"))
+    lat = request.POST.get("lat")
+    long = request.POST.get("long")
+    print(lat)
+    print(long)
+    search_query =search_query.strip().replace(" ","%20")
+    print(search_query)
+    result_final , no ,ite = search_button_execution(search_query,lat,long)
+    item_name_data =[]
+    brand_data =[]
+    category_data =[]
+    weight_data =[]
+    price_data =[]
+    image_data =[]
+    for data in result_final:
+        data = json.dumps(data)
+        result = json.loads(data)
         # result = result['tabs'][0]['product_info']['products']
-        print(result)
-        item_name_data =[]
-        brand_data =[]
-        category_data =[]
-        weight_data =[]
-        price_data =[]
-        image_data =[]
         try:
 
             for i in range(24):
@@ -193,14 +148,54 @@ def homepage(request):
                 price_data.append(price)
                 weight_data.append(weight)
                 image_data.append(image)
-        except:
-            pass
-        mylist = zip(item_name_data, brand_data,category_data,weight_data,price_data,image_data)
-        items_found = result['tabs'][0]['product_info']['total_count']
+        except Exception as e:
+            print(e)
+    mylist = zip(item_name_data, brand_data,category_data,weight_data,price_data,image_data)
+    context = {
+        'mylist': mylist,
+        'items_found':ite,
+        'no_of_pages':no
+    }
+
+
+    return render(request,"results.html",
+        context
+        )
+
+# @login_required(login_url='/admin')
+def homepage(request):
+    if request.method == 'GET':
+        return render(request,"index.html")
+    elif request.method == 'POST':
+        search_query = str(request.POST.get("search_query"))
+        print(search_query)
+        prod_obj = Products.objects.filter(item_name__icontains=search_query)
+
+        item_name_data =[]
+        brand_data =[]
+        base_category_data =[]
+        sub_category_data =[]
+        weight_data =[]
+        price_data =[]
+        image_data =[]
+        for obj in prod_obj:
+            price_weight = price_weight_location_relation.objects.filter(product_id=obj.id)
+            price_list = ''
+            weight_list = ''
+            for pw in price_weight:
+                price_list += " Rs " +  str(pw.price)
+                weight_list += " " +   str(pw.weight)
+            item_name_data.append(obj.item_name)
+            brand_data.append(obj.brand_name)
+            base_category_data.append(obj.base_category)
+            sub_category_data.append(obj.sub_category)
+            price_data.append(price_list)
+            weight_data.append(weight_list)
+            image_data.append(obj.image)
+
+        mylist = zip(item_name_data, brand_data,base_category_data,sub_category_data,weight_data,price_data,image_data)
         context = {
-            'mylist': mylist,
-            'items_found': items_found,
-            'no_of_pages': no_of_pages,
+            'mylist': mylist
         }
 
 
@@ -216,14 +211,14 @@ def search_results(request):
         if len(game) < 3:
             return JsonResponse({})
         print(game)
-        qs = address.objects.filter(address_field__icontains=game)
+        qs = Location.objects.filter(area_name__icontains=game)
         print(qs)
         if len(qs) > 0 and len(game) > 0:
             data = []
             for pos in qs:
                 item = {
                     'pk':pos.pk,
-                    'address':pos.address_field,
+                    'address':pos.area_name,
                     'lat':pos.lat,
                     'long':pos.long
                 }
@@ -236,11 +231,12 @@ def search_results(request):
 
 
 
-def fetch_address_of_city(request):
-    city = City.objects.get(id=1)
-    city_u_id = city.city_unique_id
-    data_address = fetch_address_by_city(city_u_id)
+def fetch_address_of_city(request,city_id):
+
+    data_address = fetch_address_by_city(city_id)
     print(data_address)
     
     return HttpResponse(f'<p>SuccessFull {data_address}</p>')
+
+
 
